@@ -9,8 +9,8 @@
 
 #define WIDTH 64
 #define HEIGHT 64
-#define SCALE_X 1
-#define SCALE_Y 1
+#define SCALE_X 3
+#define SCALE_Y 3
 #define LENGTH 10
 #define PI 3.14159265
 
@@ -81,14 +81,6 @@ int saveppm(int width, int height, pixel_t *pixels, char *filename)
     fclose(fp);
     
     return 0;
-}
-
-float f_distance;
-float distance(pnt2d_t p1, pnt2d_t p2)
-{
-	float f_distance = sqrt((p1.x - p2.x) * (p1.x - p2.x)
-			 + (p1.y - p2.y) * (p1.y - p2.y));
-	return f_distance;		
 }
 
 //vec2d_t *test;
@@ -188,7 +180,7 @@ void generateNoise()
 }
 
 double f_kFilter;
-double Kernal(float s, float L)
+double Kernal(int s, int L)
 {
 	if (s < 0) {
 		s = -s;
@@ -201,6 +193,38 @@ double Kernal(float s, float L)
 double Text(int x, int y)
 {
 	return noise[x][y];
+}
+
+double LIC(int L, list<pnt2d_t> pnts)
+{
+	double s_0 = 0.0;
+
+	double a = s_0 - L * 1.0;
+	double b = s_0 + L * 1.0;
+	
+	double s = a;
+	double func;
+	
+	double step = (b - a) / (10);
+//	double step = (b - a) / (100);
+	double result = 0.0;
+	
+	int m = 0;
+	while (s < b)
+	{
+		int n = int(s - a);
+		if (m == 10 && !pnts.empty()) {
+			pnts.pop_front();
+			m = 0;
+		}
+//		cout << pnts.front().y << " ";
+		func = Kernal(s, L) * Text(pnts.front().x, pnts.front().y);
+		result += step * func;
+		s += step;
+		m++;
+	}
+	
+	return result;
 }
 
 pnt2d_t p_t;
@@ -243,80 +267,9 @@ pnt2d_t RKA(int x, int y, float deltaT)
 	return p_t;
 }
 
-double LIC(float L, pnt2d_t p1, pnt2d_t p2)
-{
-	float delta1 = 1.0;
-	float delta2 = -1.0;
-	double tmpLen;	
-	double func;
-	pnt2d_t p3, p4;
-	while (tmpLen < LENGTH) {
-		p3 = RKA(p1.x, p1.y, delta1);
-		p4 = RKA(p2.x, p2.y, delta2);
-				
-		if (0 <= p3.x && p3.x <= WIDTH * SCALE_X
-			&& 0 <= p3.y && p3.y <= HEIGHT * SCALE_Y) {
-//			pnts.push_back(pnt1);
-			tmpLen += distance(p1, p3);
-			func += Kernal(tmpLen, LENGTH * 1.0) * Text(p3.x, p3.y);
-		}
-				
-		if (0 <= p4.x && p4.x <= WIDTH * SCALE_X
-			&& 0 <= p4.y && p4.y <= HEIGHT * SCALE_Y) {
-//			pnts.push_front(pnt3);
-			tmpLen += distance(p2, p4);
-			func += Kernal(tmpLen, LENGTH * 1.0) * Text(p4.x, p4.y);
-		}	
-		p1.x = p3.x;
-		p1.y = p3.y;
-		p2.x = p4.x;
-		p2.y = p4.y;
-	}
-	return func;	
-}
-
-
-/*
-double LIC(float L, list<pnt2d_t> pnts, int count)
-{
-	double s_0 = 0.0;
-
-	double a = s_0 - L * 1.0;
-	double b = s_0 + L * 1.0;
-	
-	double s = a;
-	double func;
-	
-	double step = (b - a) / (10);
-//	double step = (b - a) / (100);
-	double result = 0.0;
-	
-	int m = 0;
-	while (s < b)
-	{
-		int n = int(s - a);
-		if (m == 10 && !pnts.empty()) {
-			pnts.pop_front();
-			m = 0;
-		}
-//		cout << pnts.front().y << " ";
-		func = Kernal(s, count / 2)
-		       * Text(pnts.front().x, pnts.front().y);
-		result += step * func;
-		s += step;
-		m++;
-	}
-	
-	return result;
-}
-*/
-
-
-
 
 int main()
 {
-	float distance(pnt2d_t, pnt2d_t);
 // read the file
 	data = new vec2d_t[WIDTH * HEIGHT];
 	data_c = new vec2d_t[WIDTH * HEIGHT];	
@@ -337,33 +290,54 @@ int main()
         	return 0;            
     	} 
     
-    	int x, y, index, count;
+    	int x, y, index, tmpLen;
 
 	float delta1 = 1;
 	float delta2 = -1;
-
-//	float tmpLen;
     
 	pnt2d_t pnt0, pnt1;
-//	pnt2d_t pnt2, pnt3;
+	pnt2d_t pnt2, pnt3;
 	for (y = 0; y < height; y++) {
         	for (x = 0; x < width; x++) {
-            		index  = x + y * width;
+            		index = x + y * width;
 			pnt0.x = x;
 			pnt0.y = y;
-			pnt1.x = x;
-			pnt1.y = y;
-
-			image[index].r = LIC(LENGTH, pnt0, pnt1);
-			image[index].g = LIC(LENGTH, pnt0, pnt1);
-			image[index].b = LIC(LENGTH, pnt0, pnt1);
+			pnt2.x = x;
+			pnt2.y = y;
+			tmpLen = 0;
+			list<pnt2d_t> pnts;
+			for (int i = 0; i < LENGTH; i++) {
+				pnt1 = RKA(pnt0.x, pnt0.y, delta1);
+				pnt3 = RKA(pnt2.x, pnt2.y, delta2);
+				
+				if (0 <= pnt1.x && pnt1.x <= width
+				    && 0 <= pnt1.y && pnt1.y <= height) {
+					pnts.push_back(pnt1);
+					tmpLen++;
+				}
+				
+				if (0 <= pnt3.x && pnt3.x <= width
+				    && 0 <= pnt3.y && pnt3.y <= height) {
+					pnts.push_front(pnt3);
+					tmpLen++;
+				}
+				
+				pnt0.x = pnt1.x;
+				pnt0.y = pnt1.y;
+				pnt2.x = pnt3.x;
+				pnt2.y = pnt3.y;
+			}
+//			cout << x << " " << y << " ";
+//			cout << pnts.size() << " " << endl;
+//			cout << pnt1.x << " " << pnt1.y << endl;
+//			cout << pnt3.x << " " << pnt3.y << endl;
+			
+			image[index].r = LIC(tmpLen, pnts);
+			image[index].g = LIC(tmpLen, pnts);
+			image[index].b = LIC(tmpLen, pnts);
 			image[index].a = 1;
-
-//			tmpLen = 0.0;
-//			count  = 0;
-//			list<pnt2d_t> pnts;	
-       		}
-    	}
+        }
+    }
 //	pnt0.x = 54;
 //	pnt0.y = 8;
 //	pnt2.x = 54;
