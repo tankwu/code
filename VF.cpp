@@ -9,9 +9,9 @@
 
 #define WIDTH 64
 #define HEIGHT 64
-#define SCALE_X 1
-#define SCALE_Y 1
-#define LENGTH 10
+#define SCALE_X 3
+#define SCALE_Y 3
+#define LENGTH 4
 #define PI 3.14159265
 
 
@@ -83,11 +83,11 @@ int saveppm(int width, int height, pixel_t *pixels, char *filename)
     return 0;
 }
 
-float f_distance;
-float distance(pnt2d_t p1, pnt2d_t p2)
+double f_distance;
+double distance(int p1x, int p1y, int p2x, int p2y)
 {
-	float f_distance = sqrt((p1.x - p2.x) * (p1.x - p2.x)
-			 + (p1.y - p2.y) * (p1.y - p2.y));
+	float f_distance = sqrt((p1x - p2x) * (p1x - p2x)
+			 + (p1y - p2y) * (p1y - p2y));
 	return f_distance;		
 }
 
@@ -204,12 +204,12 @@ double Text(int x, int y)
 }
 
 pnt2d_t p_t;
-pnt2d_t RKA(int x, int y, float deltaT)
+pnt2d_t RKA(pnt2d_t pnt, float deltaT)
 {
 //	float deltaT = 0.1;
 	vec2d_t v_i;
-	v_i = bilinear((x * 1.0) / (SCALE_X * 1.0),
-		       (y * 1.0) / (SCALE_Y * 1.0), v_i);
+	v_i = bilinear((pnt.x * 1.0) / (SCALE_X * 1.0),
+		       (pnt.y * 1.0) / (SCALE_Y * 1.0), v_i);
 	p_t.x = 0;
 	p_t.y = 0;
 //	pnt2d_t p;
@@ -218,18 +218,19 @@ pnt2d_t RKA(int x, int y, float deltaT)
 	vec2d_t v_2_i;
 	vec2d_t v_3_i;
 	
-	v_1_i.x = (float)x + (1.0 / 2.0) * deltaT * v_i.x;
-	v_2_i.x = (float)x + (1.0 / 2.0) * deltaT * v_1_i.x;
-	v_3_i.x = (float)x + deltaT * v_2_i.x;
+	v_1_i.x = (float)pnt.x + (1.0 / 2.0) * deltaT * v_i.x;
+	v_2_i.x = (float)pnt.x + (1.0 / 2.0) * deltaT * v_1_i.x;
+	v_3_i.x = (float)pnt.x + deltaT * v_2_i.x;
 	
-	v_1_i.y = (float)y + (1.0 / 2.0) * deltaT * v_i.y;
-	v_2_i.y = (float)y + (1.0 / 2.0) * deltaT * v_1_i.y;
-	v_3_i.y = (float)y + deltaT * v_2_i.y;
+	v_1_i.y = (float)pnt.y + (1.0 / 2.0) * deltaT * v_i.y;
+	v_2_i.y = (float)pnt.y + (1.0 / 2.0) * deltaT * v_1_i.y;
+	v_3_i.y = (float)pnt.y + deltaT * v_2_i.y;
 	
-	float tmpX = (float)x + (1.0 / 6.0) * deltaT * (v_i.x + 2 * v_1_i.x +
+	float tmpX = (float)pnt.x + (1.0 / 6.0) * deltaT * (v_i.x + 2 * v_1_i.x +
 			 			        2 * v_2_i.x +v_3_i.x);
-	float tmpY = (float)y + (1.0 / 6.0) * deltaT * (v_i.y + 2 * v_1_i.y +
+	float tmpY = (float)pnt.y + (1.0 / 6.0) * deltaT * (v_i.y + 2 * v_1_i.y +
 						 	2 * v_2_i.y +v_3_i.y);
+	
 	if (tmpX - int(tmpX) > 0.5) {
 		p_t.x = int(tmpX) + 1;
 	} else {
@@ -239,183 +240,101 @@ pnt2d_t RKA(int x, int y, float deltaT)
 		p_t.y = int(tmpY) + 1;
 	} else {
 		p_t.y = int(tmpY);
-	}	
+	}
+	
 	return p_t;
 }
 
-double LIC(float L, pnt2d_t p1, pnt2d_t p2)
+double LIC(double L, pnt2d_t pnt)
 {
 	float delta1 = 1.0;
 	float delta2 = -1.0;
-	double tmpLen;	
+	double tmpLen_1, tmpLen_2;	
 	double func;
-	pnt2d_t p3, p4;
-	while (tmpLen < LENGTH) {
-		p3 = RKA(p1.x, p1.y, delta1);
-		p4 = RKA(p2.x, p2.y, delta2);
+	double weight;
+	double tmpLen;
+	int length;
+	int count = 0;
+	tmpLen = tmpLen_1 = tmpLen_2 = weight = 0.0;
+	length = 2 * LENGTH;
+	pnt2d_t p1, p2, p3, p4;
+	p1 = pnt;
+	p2 = pnt;
+	while (tmpLen < LENGTH && count <= LENGTH) {
+		p3 = RKA(p1, delta1);
+		p4 = RKA(p2, delta2);
 				
 		if (0 <= p3.x && p3.x <= WIDTH * SCALE_X
 			&& 0 <= p3.y && p3.y <= HEIGHT * SCALE_Y) {
-//			pnts.push_back(pnt1);
-			tmpLen += distance(p1, p3);
-			func += Kernal(tmpLen, LENGTH * 1.0) * Text(p3.x, p3.y);
+			tmpLen_1 = tmpLen_1 + distance(p1.x, p1.y, p3.x, p3.y);
+			func += Kernal(tmpLen_1, LENGTH * 1.0) * Text(p3.x, p3.y);
+			weight += Kernal(tmpLen_1, LENGTH * 1.0);
 		}
 				
 		if (0 <= p4.x && p4.x <= WIDTH * SCALE_X
 			&& 0 <= p4.y && p4.y <= HEIGHT * SCALE_Y) {
-//			pnts.push_front(pnt3);
-			tmpLen += distance(p2, p4);
-			func += Kernal(tmpLen, LENGTH * 1.0) * Text(p4.x, p4.y);
+			tmpLen_2 = tmpLen_2 + distance(p2.x, p2.y, p4.x, p4.y);
+			func += Kernal(tmpLen_2, LENGTH * 1.0) * Text(p4.x, p4.y);
+			weight += Kernal(tmpLen_2, LENGTH * 1.0);
 		}	
+		
+		tmpLen = (tmpLen_1 <= tmpLen_2) ? tmpLen_2 : tmpLen_1;
 		p1.x = p3.x;
 		p1.y = p3.y;
 		p2.x = p4.x;
 		p2.y = p4.y;
+		count++;
 	}
-	return func;	
+	double final_result = tmpLen_1 / weight;
+	return final_result;	
 }
-
-
-/*
-double LIC(float L, list<pnt2d_t> pnts, int count)
-{
-	double s_0 = 0.0;
-
-	double a = s_0 - L * 1.0;
-	double b = s_0 + L * 1.0;
-	
-	double s = a;
-	double func;
-	
-	double step = (b - a) / (10);
-//	double step = (b - a) / (100);
-	double result = 0.0;
-	
-	int m = 0;
-	while (s < b)
-	{
-		int n = int(s - a);
-		if (m == 10 && !pnts.empty()) {
-			pnts.pop_front();
-			m = 0;
-		}
-//		cout << pnts.front().y << " ";
-		func = Kernal(s, count / 2)
-		       * Text(pnts.front().x, pnts.front().y);
-		result += step * func;
-		s += step;
-		m++;
-	}
-	
-	return result;
-}
-*/
-
-
 
 
 int main()
 {
-	float distance(pnt2d_t, pnt2d_t);
-// read the file
+//  read the file
 	data = new vec2d_t[WIDTH * HEIGHT];
-	data_c = new vec2d_t[WIDTH * HEIGHT];	
+	data_c = new vec2d_t[WIDTH * HEIGHT];
 	ifstream inf("tornado_64_2d.a2v", ios::binary);
 	inf.read(reinterpret_cast<char*>(data),
 		 WIDTH * HEIGHT * sizeof(vec2d_t));
 	
 	generateNoise();
 	
-// make a simple image 
+//  make a simple image 
 	int width = WIDTH * SCALE_X;
    	int height = HEIGHT * SCALE_Y;
     
-    	printf("Generate a simple image\n");
+    printf("Generate a simple image\n");
 	pixel_t *image = (pixel_t *)malloc(width * height * sizeof(pixel_t));
-    	if (!image) {
-        	fprintf(stderr, "Cannot allocate memory\n");
-        	return 0;            
-    	} 
+    if (!image) {
+       	fprintf(stderr, "Cannot allocate memory\n");
+        return 0;            
+    } 
     
-    	int x, y, index, count;
-
-	float delta1 = 1;
-	float delta2 = -1;
-
-//	float tmpLen;
-    
-	pnt2d_t pnt0, pnt1;
-//	pnt2d_t pnt2, pnt3;
+    int x, y, index;
+	
 	for (y = 0; y < height; y++) {
         	for (x = 0; x < width; x++) {
-            		index  = x + y * width;
-			pnt0.x = x;
-			pnt0.y = y;
-			pnt1.x = x;
-			pnt1.y = y;
-
-			image[index].r = LIC(LENGTH, pnt0, pnt1);
-			image[index].g = LIC(LENGTH, pnt0, pnt1);
-			image[index].b = LIC(LENGTH, pnt0, pnt1);
-			image[index].a = 1;
-
-//			tmpLen = 0.0;
-//			count  = 0;
-//			list<pnt2d_t> pnts;	
-       		}
-    	}
-//	pnt0.x = 54;
-//	pnt0.y = 8;
-//	pnt2.x = 54;
-//	pnt2.y = 8;
-//	tmpLen = 0;
-	
-//	pnt1 = RKA(pnt0.x, pnt0.y);
-//	pnt3 = RKA(pnt2.x, pnt2.y);
-	
-//	cout << data[1].x << " " << data[1].y << endl;
-//	cout << data_c[1].x << " " << data_c[1].y << endl;
-/*	
-		list<pnt2d_t> pnts;
-			for (int i = 0; i < LENGTH; i++) {
-				pnt1 = RKA(pnt0.x, pnt0.y, delta1);
-				pnt3 = RKA_c(pnt2.x, pnt2.y, delta2);
+				pnt2d_t pnt;
+            	index  = x + y * width;
+				pnt.x = x;
+				pnt.y = y;
 				
-				cout << pnt1.x << " " << pnt1.y << endl;
-				cout << pnt3.x << " " << pnt3.y << endl;
+				image[index].r = LIC(LENGTH * 1.0d, pnt);
+				image[index].g = LIC(LENGTH * 1.0d, pnt);
+				image[index].b = LIC(LENGTH * 1.0d, pnt);
+				image[index].a = 1;
+//				cout << x << " ";
+       }
+    }
 	
-	
-				if (0 <= pnt1.x && pnt1.x <= width
-				    && 0 <= pnt1.y && pnt1.y <= height) {
-					pnts.push_back(pnt1);
-					tmpLen++;
-				}
-				if (0 <= pnt3.x && pnt3.x <= width
-				    && 0 <= pnt3.y && pnt3.y <= height) {
-					pnts.push_front(pnt3);
-					tmpLen++;
-				}
-//				cout << "test" << endl;
-				pnt0.x = pnt1.x;
-				pnt0.y = pnt1.y;
-				pnt2.x = pnt3.x;
-				pnt2.y = pnt3.y;
-			}
-//			cout << tmpLen << endl;
-//			cout << pnts.size() << endl;
-			
-	for (int i = 0; i < tmpLen; i++) {
-		cout << pnts.front().x << " " << pnts.front().y << endl;
-		cout << pnts.size() << endl;
-		pnts.pop_front();
-	}	
-*/
-// save the image to a ppm file 
+//  save the image to a ppm file 
 	char str[] = "test.ppm";
-    	printf("Save the image to test.ppm\n");
-    	saveppm(width, height, image, str);
+    printf("Save the image to test.ppm\n");
+    saveppm(width, height, image, str);
     
-    	free(image);
+	delete data, data_c, image;
     
-    	return 0;
+    return 0;
 }
